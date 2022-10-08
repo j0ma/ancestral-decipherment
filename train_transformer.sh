@@ -1,35 +1,17 @@
 #!/usr/bin/env bash
 
-DATA_BIN_PATH=$1
-CHECKPOINT_FOLDER=$2
+EXPERIMENT_NAME=$1
+MODEL_NAME=$2
 SRC_LANG=${3:-yid}
 TGT_LANG=${4:-deu}
 
-LR=0.0005
-EED=512
-EHS=2048
-DED=512
-DHS=2048
-SEED=1917
-PATIENCE=5
-P_DROPOUT=0.1
-CRITERION=label_smoothed_cross_entropy
-OPTIMIZER=adam
-CLIP_NORM=1.0
-MAX_TOKENS=10000
-MAX_UPDATE=100000
-LR_SCHEDULER=inverse_sqrt
-ACTIVATION_FN=relu
-SAVE_INTERVAL=1
-ENCODER_LAYERS=6
-DECODER_LAYERS=6
-LABEL_SMOOTHING=0.1
-ENCODER_ATTENTION_HEADS=8
-DECODER_ATTENTION_HEADS=8
-VALIDATE_INTERVAL=1
-WARMUP_INIT_LR=0.001
-WARMUP_UPDATES=100
-MAX_EPOCHS=20
+EXPERIMENT_FOLDER="./experiments/${EXPERIMENT_NAME}"
+TRAIN_FOLDER="${EXPERIMENT_FOLDER}/train/${MODEL_NAME}"
+DATA_BIN_PATH="${TRAIN_FOLDER}/binarized_data"
+CHECKPOINTS_PATH="${TRAIN_FOLDER}/checkpoints"
+TENSORBOARD_PATH="${TRAIN_FOLDER}/tensorboard"
+
+. transformer_config.sh
 
 train() {
     local -r CP="$1"
@@ -38,7 +20,6 @@ train() {
     fairseq-train \
         "${DATA_BIN_PATH}" \
         --task translation \
-        --cpu \
         --save-dir="${CP}" \
         --source-lang="${SRC_LANG}" \
         --target-lang="${TGT_LANG}" \
@@ -69,15 +50,13 @@ train() {
         --max-tokens="${MAX_TOKENS}" \
         --save-interval="${SAVE_INTERVAL}" \
         --validate-interval="${VALIDATE_INTERVAL}" \
-        --adam-betas '(0.9, 0.98)' --update-freq=16 \
+        --adam-betas '(0.9, 0.98)' --update-freq=1 \
         --no-epoch-checkpoints \
         --skip-invalid-size-inputs-valid-test \
         --warmup-updates "${WARMUP_UPDATES}" \
         --warmup-init-lr "${WARMUP_INIT_LR}" \
-        --max-epoch "${MAX_EPOCHS}"
-        #--max-update="${MAX_UPDATE}" \
-        #--fp16 \
-
+        --tensorboard-logdir "${TENSORBOARD_PATH}" \
+        --max-epoch "${MAX_EPOCHS}" --fp16 --reset-optimizer
 }
 
-train "${CHECKPOINT_FOLDER}"
+train "${CHECKPOINTS_PATH}"

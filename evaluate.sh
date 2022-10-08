@@ -4,27 +4,20 @@ set -euo pipefail
 
 # Command line arguments & defaults.
 EXPERIMENT_NAME=$1
-SPLIT=$2
-BEAM=$3
-SEED=$4
-EVAL_NAME=$5
-DEFAULT_LANGS_FILE=""
-LANGS_FILE=${6:-$DEFAULT_LANGS_FILE}
-SRC_LANG=${7:-yid}
-TGT_LANG=${8:-deu}
+MODEL_NAME=${2:-transformer}
+SPLIT=${3:-test}
+BEAM=${4:-5}
+SEED=${5:-1917}
+SRC_LANG=${6:-yid}
+TGT_LANG=${7:-deu}
 
 EXPERIMENT_FOLDER="$(pwd)/experiments/${EXPERIMENT_NAME}"
-DATA_BIN_FOLDER="${EXPERIMENT_FOLDER}/binarized_data"
-CHECKPOINT_FOLDER="${EXPERIMENT_FOLDER}/checkpoints"
-EVAL_OUTPUT_FOLDER="${EXPERIMENT_FOLDER}/${EVAL_NAME}"
-
-mkdir -vp $EVAL_OUTPUT_FOLDER
-
-if [[ -z $BEAM ]]; then
-    readonly BEAM=100
-fi
-
-RAW_DATA_FOLDER="${EXPERIMENT_FOLDER}/raw_data"
+TRAIN_FOLDER="${EXPERIMENT_FOLDER}/train/${MODEL_NAME}"
+EVAL_FOLDER="${EXPERIMENT_FOLDER}/eval/eval_${MODEL_NAME}"
+DATA_BIN_FOLDER="${TRAIN_FOLDER}/binarized_data"
+CHECKPOINT_FOLDER="${TRAIN_FOLDER}/checkpoints"
+EVAL_OUTPUT_FOLDER="${EXPERIMENT_FOLDER}/eval"
+RAW_DATA_FOLDER="${TRAIN_FOLDER}/raw_data"
 
 echo "DATA_BIN_FOLDER=${DATA_BIN_FOLDER}"
 echo "CHECKPOINT_FOLDER=${CHECKPOINT_FOLDER}"
@@ -72,8 +65,16 @@ evaluate() {
     SCORE="${EVAL_OUTPUT_FOLDER}/${SPLIT}.eval.score"
     SCORE_TSV="${EVAL_OUTPUT_FOLDER}/${SPLIT}_eval_results.tsv"
 
+    if [ -z "${CUDA_VISIBLE_DEVICES}" ]
+    then
+        CPU_FLAG="--cpu"
+    else
+        CPU_FLAG=""
+    fi
+
     echo "Evaluating into ${OUT}"
 
+        #"${CPU_FLAG}" \
     # Make raw predictions
     fairseq-generate \
         "${DATA_BIN_FOLDER}" \
@@ -83,6 +84,7 @@ evaluate() {
         --seed="${SEED}" \
         --gen-subset="${FAIRSEQ_SPLIT}" \
         --beam="${BEAM_SIZE}" \
+        --max-tokens 10000 \
         --no-progress-bar | tee "${OUT}"
 
     # Also separate gold/system output/source into separate text files
@@ -91,27 +93,14 @@ evaluate() {
     cat "${OUT}" | grep '^H-' | sed "s/^H-//g" | sort -k1 -n | cut -f3 >"${HYPS}"
     cat "${OUT}" | grep '^S-' | sed "s/^S-//g" | sort -k1 -n | cut -f2 >"${SOURCE}"
 
-    if [ -z "$LANGS_FILE" ]; then
-        echo "Inferring languages from Fairseq output"
-        cat "${OUT}" | grep '^S-' | cut -f2 | grep -P -o "^<.*>" | cut -f1 -d' ' | tr -d '<>' >"${LANGS}"
-    else
-        echo "Outputting languages from ${LANGS_FILE} if needed"
-        cat "${LANGS_FILE}" >"${LANGS}.tmp"
-        [ -e "${LANGS}" ] && echo "Backing up existing file: ${LANGS}" && cp ${LANGS} ${LANGS}.bak
-        mv "${LANGS}.tmp" "${LANGS}"
-    fi
     paste "${GOLD}" "${HYPS}" "${SOURCE}" >"${SOURCE_TSV}"
+
+    # If using multiple languages, this will need to change.
+    cat "${SOURCE_TSV}" | while read line; do echo "${TGT_LANG}"; done >"${LANGS}"
+
     paste "${SOURCE_TSV}" "${LANGS}" >"${SOURCE_LANGS_TSV}"
 
-    # Compute some evaluation metrics
-    python scripts/evaluate.py \
-        --references-path "${GOLD}" \
-        --hypotheses-path "${HYPS}" \
-        --languages-path "${LANGS}" \
-        --source-path "${SOURCE}" \
-        --score-output-path "${SCORE}"
-
-    python scripts/evaluate.py \
+    python evaluate.py \
         --tsv "${SOURCE_LANGS_TSV}" \
         --score-output-path "${SCORE}" \
         --output-as-tsv

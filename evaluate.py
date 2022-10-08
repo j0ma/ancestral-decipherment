@@ -8,13 +8,66 @@ import click
 import attr
 import sys
 
-from paranames.util import read as read_df
 import pandas as pd
 from tqdm import tqdm
+
+from typing import *
 
 """
 Computes SER evaluation metrics for deciphered words
 """
+
+def read_df(
+    input_file: str,
+    io_format: str,
+    typ: str = "frame",
+    chunksize: Union[int, None] = None,
+    column_names: Optional[List[str]] = None,
+    **kwargs,
+) -> pd.DataFrame:
+    if io_format in ["csv", "tsv"]:
+        return pd.read_csv(
+            input_file,
+            encoding="utf-8",
+            delimiter="\t" if io_format == "tsv" else ",",
+            chunksize=chunksize,
+            na_values=set(
+                [
+                    "#N/A",
+                    "#N/A N/A",
+                    "#NA",
+                    "-1.#IND",
+                    "-1.#QNAN",
+                    "-NaN",
+                    "1.#IND",
+                    "1.#QNAN",
+                    "<NA>",
+                    "N/A",
+                    "NA",
+                    "NULL",
+                    "NaN",
+                    "n/a",
+                    "null",
+                ]
+            ),
+            keep_default_na=False,
+            names=column_names,
+            **kwargs,
+        )
+    elif io_format == "jsonl":
+        return pd.read_json(
+            input_file,
+            "records",
+            encoding="utf-8",
+            typ=typ,
+            lines=True,
+            chunksize=chunksize,
+            **kwargs,
+        )
+    elif io_format == "json":
+        return pd.read_json(
+            input_file, encoding="utf-8", typ=typ, chunksize=chunksize, **kwargs
+        )
 
 
 def read_text(path: str) -> TextIO:
