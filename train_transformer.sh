@@ -4,14 +4,16 @@ EXPERIMENT_NAME=$1
 MODEL_NAME=$2
 SRC_LANG=${3:-yid}
 TGT_LANG=${4:-deu}
+CONFIG_FILE=${5:-transformer_config.sh}
 
 EXPERIMENT_FOLDER="./experiments/${EXPERIMENT_NAME}"
 TRAIN_FOLDER="${EXPERIMENT_FOLDER}/train/${MODEL_NAME}"
 DATA_BIN_PATH="${TRAIN_FOLDER}/binarized_data"
 CHECKPOINTS_PATH="${TRAIN_FOLDER}/checkpoints"
 TENSORBOARD_PATH="${TRAIN_FOLDER}/tensorboard"
+PLAINTEXT_LOG_PATH="${TRAIN_FOLDER}/train.log"
 
-. transformer_config.sh
+. ${CONFIG_FILE}
 
 train() {
     local -r CP="$1"
@@ -50,13 +52,14 @@ train() {
         --max-tokens="${MAX_TOKENS}" \
         --save-interval="${SAVE_INTERVAL}" \
         --validate-interval="${VALIDATE_INTERVAL}" \
-        --adam-betas '(0.9, 0.98)' --update-freq=1 \
+        --adam-betas '(0.9, 0.98)' --update-freq 4 \
         --no-epoch-checkpoints \
         --skip-invalid-size-inputs-valid-test \
         --warmup-updates "${WARMUP_UPDATES}" \
         --warmup-init-lr "${WARMUP_INIT_LR}" \
         --tensorboard-logdir "${TENSORBOARD_PATH}" \
-        --max-epoch "${MAX_EPOCHS}" --fp16 --reset-optimizer
+        --max-epoch "${MAX_EPOCHS}" --fp16 --reset-optimizer --num-workers 0
 }
 
-train "${CHECKPOINTS_PATH}"
+echo "Beginning training: $(date)" | tee -a "${PLAINTEXT_LOG_PATH}"
+train "${CHECKPOINTS_PATH}" | tee -a "${PLAINTEXT_LOG_PATH}"
