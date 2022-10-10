@@ -13,11 +13,10 @@ TGT_LANG=${7:-deu}
 
 EXPERIMENT_FOLDER="$(pwd)/experiments/${EXPERIMENT_NAME}"
 TRAIN_FOLDER="${EXPERIMENT_FOLDER}/train/${MODEL_NAME}"
-EVAL_FOLDER="${EXPERIMENT_FOLDER}/eval/eval_${MODEL_NAME}"
 DATA_BIN_FOLDER="${TRAIN_FOLDER}/binarized_data"
 CHECKPOINT_FOLDER="${TRAIN_FOLDER}/checkpoints"
-EVAL_OUTPUT_FOLDER="${EXPERIMENT_FOLDER}/eval"
 RAW_DATA_FOLDER="${TRAIN_FOLDER}/raw_data"
+EVAL_OUTPUT_FOLDER="${EXPERIMENT_FOLDER}/eval/eval_${MODEL_NAME}"
 
 echo "DATA_BIN_FOLDER=${DATA_BIN_FOLDER}"
 echo "CHECKPOINT_FOLDER=${CHECKPOINT_FOLDER}"
@@ -102,11 +101,11 @@ evaluate() {
 
     python evaluate.py \
         --tsv "${SOURCE_LANGS_TSV}" \
-        --score-output-path "${SCORE}" \
+        --score-output-path "${SCORE_TSV}" \
         --output-as-tsv
 
     # Finally output the score so Guild.ai grab it
-    cat "${SCORE}"
+    cat "${SCORE_TSV}"
 }
 
 evaluate "${DATA_BIN_FOLDER}" "${EXPERIMENT_FOLDER}" "${CHECKPOINT_FOLDER}" "${SPLIT}" "${BEAM}" "${SEED}"
